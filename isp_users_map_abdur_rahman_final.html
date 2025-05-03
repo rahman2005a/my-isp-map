@@ -1,0 +1,168 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ISP Users Map - Abdur Rahman</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <style>
+    #map { height: 500px; border-radius: 12px; }
+    body { font-family: sans-serif; padding: 20px; }
+    select, input, button { margin-bottom: 10px; padding: 5px; width: 100%; max-width: 400px; }
+    .login-form { text-align: center; margin-top: 50px; }
+  </style>
+</head>
+<body>
+
+  <div id="loginPage" class="login-form">
+    <h2>Admin Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="loginError" style="color: red;"></p>
+  </div>
+
+  <div id="mainPage" style="display: none;">
+    <h1>ISP Users Map - Abdur Rahman</h1>
+    <label for="villageFilter">Filter by Village:</label>
+    <select id="villageFilter"></select>
+
+    <h2>Search Customer</h2>
+    <input id="searchInput" placeholder="Search by name or phone">
+    <button onclick="searchCustomer()">Search</button>
+
+    <h2>Add New Customer</h2>
+    <input id="name" placeholder="Name">
+    <input id="phone" placeholder="Phone Number">
+    <input id="village" placeholder="Village">
+    <input id="ip" placeholder="Login IP">
+    <input id="location" placeholder="Location (lat,lng)">
+    <button onclick="addCustomer()">Add Customer</button>
+
+    <div id="map"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script>
+    const correctUsername = "admin"; // Username
+    const correctPassword = "rahman"; // Updated password
+
+    function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+
+      if (username === correctUsername && password === correctPassword) {
+        document.getElementById("loginPage").style.display = "none";
+        document.getElementById("mainPage").style.display = "block";
+        initMap();
+      } else {
+        document.getElementById("loginError").textContent = "Invalid username or password!";
+      }
+    }
+
+    let customers = [];
+
+    function loadCustomers() {
+      const stored = localStorage.getItem("customers");
+      if (stored) {
+        try {
+          customers = JSON.parse(stored);
+        } catch (e) {
+          customers = [];
+        }
+      } else {
+        customers = [
+          { id: 1, name: "Rahim Uddin", phone: "01711111111", village: "Chhayfullakandi", ip: "192.168.1.10", location: [23.7879, 90.8602] },
+          { id: 2, name: "Karim Mia", phone: "01722222222", village: "Shahpara", ip: "192.168.1.11", location: [23.7885, 90.8610] },
+        ];
+        localStorage.setItem("customers", JSON.stringify(customers));
+      }
+    }
+
+    loadCustomers();
+
+      { id: 1, name: "Rahim Uddin", phone: "01711111111", village: "Chhayfullakandi", ip: "192.168.1.10", location: [23.7879, 90.8602] },
+      { id: 2, name: "Karim Mia", phone: "01722222222", village: "Shahpara", ip: "192.168.1.11", location: [23.7885, 90.8610] },
+    ];
+
+    const allowedVillages = ["Chhayfullakandi", "Shahpara"];
+    customers = customers.filter(c => allowedVillages.includes(c.village));
+
+    let map;
+
+    function initMap() {
+      map = L.map('map').setView([23.78778, 90.86056], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+      const unionCenter = [23.78778, 90.86056];
+      const radius = 2000;
+      const unionCircle = L.circle(unionCenter, { radius, color: 'blue', fillOpacity: 0.1 }).addTo(map);
+      const bounds = unionCircle.getBounds();
+      map.setMaxBounds(bounds);
+      map.fitBounds(bounds);
+      
+      const villageFilter = document.getElementById("villageFilter");
+      updateVillageOptions();
+
+      let markers = [];
+
+      function showCustomer(customer) {
+        markers.forEach(m => map.removeLayer(m));
+        markers = [];
+
+        const marker = L.marker(customer.location).addTo(map);
+        marker.bindPopup(`<b>${customer.name}</b><br>Phone: ${customer.phone}<br>Village: ${customer.village}<br>Login IP: ${customer.ip}`);
+        markers.push(marker);
+        map.setView(customer.location, 16);
+      }
+
+      function updateVillageOptions() {
+        const villages = ["All", ...new Set(customers.map(c => c.village))];
+        villageFilter.innerHTML = villages.map(v => `<option value="${v}">${v}</option>`).join("");
+      }
+
+      window.addCustomer = function () {
+        const name = document.getElementById("name").value;
+        const phone = document.getElementById("phone").value;
+        const village = document.getElementById("village").value;
+        const ip = document.getElementById("ip").value;
+        const loc = document.getElementById("location").value.split(",").map(Number);
+        if (!name || !phone || !village || !ip || loc.length !== 2 || isNaN(loc[0]) || isNaN(loc[1])) {
+          alert("Please fill out all fields correctly.");
+          return;
+        }
+        if (!allowedVillages.includes(village)) {
+          alert("Village not allowed.");
+          return;
+        }
+        const id = customers.length + 1;
+        customers.push({ id, name, phone, village, ip, location: loc });
+        localStorage.setItem("customers", JSON.stringify(customers));
+        updateVillageOptions();
+        document.getElementById("name").value = "";
+        document.getElementById("phone").value = "";
+        document.getElementById("village").value = "";
+        document.getElementById("ip").value = "";
+        document.getElementById("location").value = "";
+      }
+
+      window.searchCustomer = function () {
+        const query = document.getElementById("searchInput").value.trim().toLowerCase();
+        if (!query) {
+          alert("Please enter a search term.");
+          return;
+        }
+        const customer = customers.find(c => c.name.toLowerCase().includes(query) || c.phone.includes(query));
+        if (customer) {
+          showCustomer(customer);
+        } else {
+          alert("No customer found.");
+        }
+      }
+
+      updateVillageOptions();
+    }
+  </script>
+</body>
+</html>
